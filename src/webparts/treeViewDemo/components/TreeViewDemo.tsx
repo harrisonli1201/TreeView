@@ -1,137 +1,87 @@
 import * as React from 'react';
-import styles from './TreeViewDemo.module.scss';
-import { ITreeViewDemoProps } from './ITreeViewDemoProps';
-import { escape } from '@microsoft/sp-lodash-subset';
+import styles from './SpfxPnpTreeview.module.scss';
+import { ISpfxPnpTreeviewProps, ISpfxPnpTreeviewState } from './ITreeView';
 import { TreeView, ITreeItem, TreeViewSelectionMode, TreeItemActionsDisplayMode } from "@pnp/spfx-controls-react/lib/TreeView";
-
-
-export default class TreeViewDemo extends React.Component<ITreeViewDemoProps, {}> {
-  public render(): React.ReactElement<ITreeViewDemoProps> {
+ 
+import { SPFI, spfi,SPFx } from "@pnp/sp";
+import "@pnp/sp/webs";
+import "@pnp/sp/lists";
+import "@pnp/sp/items";
+ 
+export default class SpfxPnpTreeview extends React.Component<ISpfxPnpTreeviewProps, ISpfxPnpTreeviewState> {
+  constructor(props: ISpfxPnpTreeviewProps) {
+    super(props);
+    const sp = spfi().using(SPFx(this.props.context));
+    this.state = {
+      TreeLinks: []
+    }
+    this._getLinks(sp);
+  }
+ 
+  private async _getLinks(sp) {
+    const allItems: any[] = await sp.web.lists.getByTitle("TreeLinks").items();
+ 
+    var treearr: ITreeItem[] = [];
+    allItems.forEach(function (v, i) {
+ 
+      if (v["ParentId"] == null) {
+        const tree: ITreeItem = {
+          key: v.Id,
+          label: v["Title"],
+          data: v["Link"],
+          children: []
+        }
+        treearr.push(tree);
+      }
+      else {
+        const tree: ITreeItem = {
+          key: v.Id,
+          label: v["Title"],
+          data: v["Link"]
+        }
+        var treecol: Array<ITreeItem> = treearr.filter(function (value) { return value.key == v["ParentId"] })
+        if (treecol.length != 0) {
+          treecol[0].children.push(tree);
+        }
+      }
+ 
+      console.log(v);
+    });
+    console.log(treearr);
+    this.setState({ TreeLinks: treearr });
+  }
+ 
+  public render(): React.ReactElement<ISpfxPnpTreeviewProps> {
     return (
-      <div className={styles.treeViewDemo}>
-        <div className={styles.container}>
-          <div className={styles.row}>
-            <div className={styles.column}>
-              <span className={styles.title}>Tree View PnP Control</span>
-
-              <TreeView
-                items={this.treeItems}
-                defaultExpanded={false}
-                selectionMode={TreeViewSelectionMode.Multiple}
-                selectChildrenIfParentSelected={true}
-                showCheckboxes={true}
-                treeItemActionsDisplayMode={TreeItemActionsDisplayMode.ContextualMenu}
-                defaultSelectedKeys={['R2', '6']}
-                onExpandCollapse={this.onExpandCollapseTree}
-                onSelect={this.onItemSelected} />
-            </div>
-          </div>
-        </div>
+      <div className={styles.spfxPnpTreeview}>
+        <TreeView
+          items={this.state.TreeLinks}
+          defaultExpanded={false}
+          selectionMode={TreeViewSelectionMode.None}
+          selectChildrenIfParentSelected={true}
+          showCheckboxes={true}
+          treeItemActionsDisplayMode={TreeItemActionsDisplayMode.Buttons}
+          onSelect={this.onTreeItemSelect}
+          onExpandCollapse={this.onTreeItemExpandCollapse}
+          onRenderItem={this.renderCustomTreeItem} />
       </div>
     );
   }
-
-  private treeItems = [
-    {
-      key: "R1",
-      label: "Root",
-      subLabel: "This is a sub label for node",
-      iconProps: {
-        iconName: 'SkypeCheck'
-      },
-      actions: [{
-        title: "Get item",
-        iconProps: {
-          iconName: 'Warning',
-          style: {
-            color: 'salmon',
-          },
-        },
-        id: "GetItem",
-        actionCallback: async (treeItem: ITreeItem) => {
-          console.log(treeItem);
-        }
-      }],
-      children: [
-        {
-          key: "1",
-          label: "Parent 1",
-          selectable: false,
-          children: [
-            {
-              key: "3",
-              label: "Child 1",
-              subLabel: "This is a sub label for node",
-              actions: [{
-                title: "Share",
-                iconProps: {
-                  iconName: 'Share'
-                },
-                id: "GetItem",
-                actionCallback: async (treeItem: ITreeItem) => {
-                  console.log(treeItem);
-                }
-              }],
-              children: [
-                {
-                  key: "gc1",
-                  label: "Grand Child 1",
-                  actions: [{
-                    title: "Get Grand Child item",
-                    iconProps: {
-                      iconName: 'Mail'
-                    },
-                    id: "GetItem",
-                    actionCallback: async (treeItem: ITreeItem) => {
-                      console.log(treeItem);
-                    }
-                  }]
-                }
-              ]
-            },
-            {
-              key: "4",
-              label: "Child 2",
-              iconProps: {
-                iconName: 'SkypeCheck'
-              }
-            }
-          ]
-        },
-        {
-          key: "2",
-          label: "Parent 2"
-        },
-        {
-          key: "5",
-          label: "Parent 3",
-          disabled: true
-        },
-        {
-          key: "6",
-          label: "Parent 4",
-          selectable: true
-        }
-      ]
-    },
-    {
-      key: "R2",
-      label: "Root 2",
-      children: [
-        {
-          key: "8",
-          label: "Parent 5"
-        }
-      ]
-    }
-  ];
-
-  private onExpandCollapseTree(item: ITreeItem, isExpanded: boolean) {  
-    console.log((isExpanded ? "item expanded: " : "item collapsed: ") + item);  
-  }  
-
-  private onItemSelected(items: ITreeItem[]) {  
-    console.log("items selected: " + items.length);  
-  }  
-  
+  private onTreeItemSelect(items: ITreeItem[]) {
+    console.log("Items selected: ", items);
+  }
+ 
+  private onTreeItemExpandCollapse(item: ITreeItem, isExpanded: boolean) {
+    console.log((isExpanded ? "Item expanded: " : "Item collapsed: ") + item);
+  }
+ 
+  private renderCustomTreeItem(item: ITreeItem): JSX.Element {
+    return (
+      <span>
+        <a href={item.data} target={'_blank'}>
+          {item.label}
+        </a>
+      </span>
+    );
+  }
 }
